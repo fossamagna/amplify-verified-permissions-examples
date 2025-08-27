@@ -7,11 +7,35 @@ specifies that any user authenticated via an API key can "create", "read",
 "update", and "delete" any "Todo" records.
 =========================================================================*/
 const schema = a.schema({
-  Todo: a
+  Project: a
     .model({
-      content: a.string(),
+      name: a.string(),
+      description: a.string(),
+      // relations
+      folders: a.hasMany("Folder", "projectId"),
+      files: a.hasMany("File", "projectId"),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.authenticated()]),
+  Folder: a
+    .model({
+      name: a.string(),
+      // relations
+      projectId: a.id(),
+      project: a.belongsTo("Project", "projectId"),
+      files: a.hasMany("File", "folderId"),
+    })
+    .authorization((allow) => [allow.authenticated()]),
+  File: a
+    .model({
+      name: a.string(),
+      content: a.string(),
+      // relations
+      folderId: a.id(),
+      folder: a.belongsTo("Folder", "folderId"),
+      projectId: a.id(),
+      project: a.belongsTo("Project", "projectId"),
+    })
+    .authorization((allow) => [allow.authenticated()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
@@ -19,11 +43,7 @@ export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
   schema,
   authorizationModes: {
-    defaultAuthorizationMode: "apiKey",
-    // API Key is used for a.allow.public() rules
-    apiKeyAuthorizationMode: {
-      expiresInDays: 30,
-    },
+    defaultAuthorizationMode: "userPool",
   },
 });
 
