@@ -55,6 +55,10 @@ export const data = defineData({
   authorizationModes: {
     defaultAuthorizationMode: "userPool",
   },
+  logging: {
+    fieldLogLevel: "debug",
+    excludeVerboseContent: false,
+  },
 });
 
 /*== STEP 2 ===============================================================
