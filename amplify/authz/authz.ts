@@ -11,6 +11,7 @@ import {
 } from "aws-cdk-lib/aws-appsync";
 import { IResolvable, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
+import { PolicyStore } from "./policy-store";
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
@@ -27,6 +28,8 @@ export function authz(
   //   console.log(`DataSource for ${name}`);
   //   //addAuthFunctionsToDataSources(backend.data.resources.graphqlApi, name, dataSource);
   // });
+
+  const policyStore = new PolicyStore(data, "PolicyStore");
 
   // const projectMemberDataSource = backend.data.addDynamoDbDataSource("ProjectMember", backend.data.resources.tables.ProjectMember);
   const projectMemberTable = data.resources.tables.ProjectMember;

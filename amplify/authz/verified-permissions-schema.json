@@ -1,0 +1,171 @@
+{
+  "AmplifyAVP": {
+    "entityTypes": {
+      "User": {
+        "shape": {
+          "type": "Record",
+          "attributes": {
+            "ownerProjects": {
+              "type": "Set",
+              "element": {
+                "type": "Entity",
+                "name": "Project"
+              }
+            },
+            "contributorProjects": {
+              "type": "Set",
+              "element": {
+                "type": "Entity",
+                "name": "Project"
+              }
+            },
+            "viewerProjects": {
+              "type": "Set",
+              "element": {
+                "type": "Entity",
+                "name": "Project"
+              }
+            }
+          }
+        }
+      },
+      "App": {
+        "shape": {
+          "type": "Record",
+          "attributes": {}
+        }
+      },
+      "Project": {
+        "shape": {
+          "type": "Record",
+          "attributes": {}
+        },
+        "memberOfTypes": ["App"]
+      },
+      "Folder": {
+        "memberOfTypes": ["Project"],
+        "shape": {
+          "type": "Record",
+          "attributes": {}
+        }
+      },
+      "File": {
+        "memberOfTypes": ["Folder"],
+        "shape": {
+          "type": "Record",
+          "attributes": {}
+        }
+      }
+    },
+    "actions": {
+      "getProject": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      },
+      "updateProject": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      },
+      "deleteProject": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      },
+      "getFolder": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Folder"]
+        }
+      },
+      "updateFolder": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Folder"]
+        }
+      },
+      "deleteFolder": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Folder"]
+        }
+      },
+      "getFile": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["File"]
+        }
+      },
+      "updateFile": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["File"]
+        }
+      },
+      "deleteFile": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["File"]
+        }
+      },
+      "createFolder": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      },
+      "createFile": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project", "Folder"]
+        }
+      },
+      "createProjectMember": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      },
+      "deleteProjectMember": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      },
+      "updateProjectMember": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      },
+      "listProjects": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      },
+      "listFolders": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      },
+      "listFiles": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project", "Folder"]
+        }
+      },
+      "listProjectMembers": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      }
+    }
+  }
+}
