@@ -1,12 +1,12 @@
 permit (
   principal,
   action in [
-    AmplifyAVP::Action::"getProject",
-    AmplifyAVP::Action::"getFolder",
-    AmplifyAVP::Action::"getFile",
-    AmplifyAVP::Action::"listFolders",
-    AmplifyAVP::Action::"listFiles",
-    AmplifyAVP::Action::"listProjectMembers"
+    AmplifyAVP::Action::"Query.getProject",
+    AmplifyAVP::Action::"Query.getFolder",
+    AmplifyAVP::Action::"Query.getFile",
+    AmplifyAVP::Action::"Query.listFolders",
+    AmplifyAVP::Action::"Query.listFiles",
+    AmplifyAVP::Action::"Query.listProjectMembers"
   ],
   resource
 )

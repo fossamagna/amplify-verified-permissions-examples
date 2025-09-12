@@ -58,109 +58,127 @@
       }
     },
     "actions": {
-      "getProject": {
+      "Query.getProject": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Project"]
         }
       },
-      "updateProject": {
+      "Mutation.updateProject": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Project"]
         }
       },
-      "deleteProject": {
+      "Mutation.deleteProject": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Project"]
         }
       },
-      "getFolder": {
+      "Query.getFolder": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Folder"]
         }
       },
-      "updateFolder": {
+      "Mutation.updateFolder": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Folder"]
         }
       },
-      "deleteFolder": {
+      "Mutation.deleteFolder": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Folder"]
         }
       },
-      "getFile": {
+      "Query.getFile": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["File"]
         }
       },
-      "updateFile": {
+      "Mutation.updateFile": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["File"]
         }
       },
-      "deleteFile": {
+      "Mutation.deleteFile": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["File"]
         }
       },
-      "createFolder": {
+      "Mutation.createFolder": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Project"]
         }
       },
-      "createFile": {
+      "Mutation.createFile": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Project", "Folder"]
         }
       },
-      "createProjectMember": {
+      "Mutation.createProjectMember": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Project"]
         }
       },
-      "deleteProjectMember": {
+      "Mutation.deleteProjectMember": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Project"]
         }
       },
-      "updateProjectMember": {
+      "Mutation.updateProjectMember": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Project"]
         }
       },
-      "listProjects": {
+      "Query.listProjects": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["App"]
+        }
+      },
+      "Query.listFolders": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Project"]
         }
       },
-      "listFolders": {
-        "appliesTo": {
-          "principalTypes": ["User"],
-          "resourceTypes": ["Project"]
-        }
-      },
-      "listFiles": {
+      "Query.listFiles": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Project", "Folder"]
         }
       },
-      "listProjectMembers": {
+      "Query.listProjectMembers": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      },
+      "Project.folders": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Folder"]
+        }
+      },
+      "Project.files": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["File"]
+        }
+      },
+      "Project.members": {
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Project"]

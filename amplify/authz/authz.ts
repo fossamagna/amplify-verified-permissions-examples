@@ -6,12 +6,14 @@ import {
   CfnResolver,
   Code,
   DynamoDbDataSource,
+  HttpDataSource,
   FunctionRuntime,
   IGraphqlApi,
 } from "aws-cdk-lib/aws-appsync";
 import { IResolvable, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { PolicyStore } from "./policy-store";
+import { PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
@@ -41,6 +43,39 @@ export function authz(
       name: "ProjectMemberDS",
       table: projectMemberTable,
       readOnlyAccess: true,
+    }
+  );
+
+  const serviceRole = new Role(
+    Stack.of(data.resources.graphqlApi),
+    "VerifiedPermissionsRole",
+    {
+      assumedBy: new ServicePrincipal("appsync.amazonaws.com"),
+      description: "Role for AppSync to call Verified Permissions",
+    }
+  );
+  serviceRole.addToPolicy(
+    new PolicyStatement({
+      actions: [
+        "verifiedpermissions:BatchIsAuthorized",
+        "verifiedpermissions:IsAuthorized",
+      ],
+      resources: ["*"],
+    })
+  );
+
+  const verifiedPermissionsDataSource = new HttpDataSource(
+    Stack.of(data.resources.graphqlApi),
+    "VerifiedPermissionsDS",
+    {
+      api: data.resources.graphqlApi,
+      name: "VerifiedPermissionsDS",
+      endpoint: `https://verifiedpermissions.${Stack.of(data.resources.graphqlApi).region}.amazonaws.com`,
+      serviceRole,
+      authorizationConfig: {
+        signingRegion: Stack.of(data.resources.graphqlApi).region,
+        signingServiceName: "verifiedpermissions",
+      },
     }
   );
 
@@ -93,6 +128,8 @@ export function authz(
     // Set the response mapping template
     // To reference userAttributes via `ctx.source` in child resolver.
     resolver.responseMappingTemplate = responseMappingTemplate;
+    resolver.requestMappingTemplate = `$util.qr($ctx.stash.put("policyStoreId", "${policyStore.policyStore.attrPolicyStoreId}"))
+${resolver.requestMappingTemplate}`;
   }
 
   function addAuthFunctionsToDefaultResolver(
@@ -105,20 +142,47 @@ export function authz(
       logicalId,
       resolver,
       (functions, construct) => {
-        const id = `${logicalId.replaceAll(".", "")}FetchPrincipalAttrsFn`;
+        const idPrefix = logicalId.replaceAll(".", "");
         const buildResult = build(
-          path.join(__dirname, "fetchPrincipalAttrs.ts")
+          path.join(__dirname, "resolvers", "fetchPrincipalAttrs.ts")
         );
-        const fetchPrincipalAttrs = new AppsyncFunction(construct, id, {
-          api: graphqlApi,
-          name: id,
-          dataSource: projectMemberDataSource,
-          runtime: FunctionRuntime.JS_1_0_0,
-          code: Code.fromInline(buildResult.text),
-        });
+        const fetchPrincipalAttrsId = `${idPrefix}FetchPrincipalAttrsFn`;
+        const fetchPrincipalAttrs = new AppsyncFunction(
+          construct,
+          fetchPrincipalAttrsId,
+          {
+            api: graphqlApi,
+            name: fetchPrincipalAttrsId,
+            dataSource: projectMemberDataSource,
+            runtime: FunctionRuntime.JS_1_0_0,
+            code: Code.fromInline(buildResult.text),
+          }
+        );
+
+        const isAuthorizedBuildResult = build(
+          path.join(__dirname, "resolvers", "isAuthorized.ts")
+        );
+        const IsAuthorizedFunctionId = `${idPrefix}IsAuthorizedFn`;
+        const IsAuthorizedFunction = new AppsyncFunction(
+          construct,
+          IsAuthorizedFunctionId,
+          {
+            api: graphqlApi,
+            name: IsAuthorizedFunctionId,
+            dataSource: verifiedPermissionsDataSource,
+            runtime: FunctionRuntime.JS_1_0_0,
+            code: Code.fromInline(isAuthorizedBuildResult.text),
+          }
+        );
+
         const preFunctions = functions.slice(0, -1);
         const dataFunction = functions[functions.length - 1];
-        return [...preFunctions, fetchPrincipalAttrs.functionId, dataFunction];
+        return [
+          ...preFunctions,
+          fetchPrincipalAttrs.functionId,
+          dataFunction,
+          IsAuthorizedFunction.functionId,
+        ];
       }
     );
   }
@@ -128,38 +192,51 @@ export function authz(
     logicalId: string,
     resolver: CfnResolver
   ) {
-    const pipelineConfig = resolver.pipelineConfig;
-    if (!isPipelineConfigProperty(pipelineConfig)) {
-      console.warn(
-        `  Pipeline config for ${logicalId} is not PipelineConfigProperty. it isn't supported.`
-      );
-      return;
-    }
-    const functions = pipelineConfig.functions;
-    if (!functions) {
-      console.warn(`  No functions found in pipeline config for GetResolver.`);
-      return;
-    }
-    const stack = Stack.of(resolver);
-    const id = `${logicalId.replaceAll(".", "")}FetchPrincipalAttrsFn`;
-    const buildResult = build(path.join(__dirname, "fetchPrincipalAttrs.ts"));
-    const fetchPrincipalAttrs = new AppsyncFunction(stack, id, {
-      api: graphqlApi,
-      name: id,
-      dataSource: projectMemberDataSource,
-      runtime: FunctionRuntime.JS_1_0_0,
-      code: Code.fromInline(buildResult.text),
-    });
-    const [auth, postAuth, data] = functions;
-    resolver.addPropertyOverride("PipelineConfig.Functions", [
-      auth,
-      postAuth,
-      fetchPrincipalAttrs.functionId,
-      data,
-    ]);
-    // Set the response mapping template
-    // To reference userAttributes via `ctx.source` in child resolver.
-    resolver.responseMappingTemplate = responseMappingTemplate;
+    return addAuthFunctionsToResolver(
+      graphqlApi,
+      logicalId,
+      resolver,
+      (functions, construct) => {
+        const idPrefix = logicalId.replaceAll(".", "");
+        const id = `${idPrefix}FetchPrincipalAttrsFn`;
+        const buildResult = build(
+          path.join(__dirname, "resolvers", "fetchPrincipalAttrs.ts")
+        );
+        const fetchPrincipalAttrs = new AppsyncFunction(construct, id, {
+          api: graphqlApi,
+          name: id,
+          dataSource: projectMemberDataSource,
+          runtime: FunctionRuntime.JS_1_0_0,
+          code: Code.fromInline(buildResult.text),
+        });
+
+        const isAuthorizedBuildResult = build(
+          path.join(__dirname, "resolvers", "isAuthorized.ts")
+        );
+        const IsAuthorizedFunctionId = `${idPrefix}IsAuthorizedFn`;
+        const IsAuthorizedFunction = new AppsyncFunction(
+          construct,
+          IsAuthorizedFunctionId,
+          {
+            api: graphqlApi,
+            name: IsAuthorizedFunctionId,
+            dataSource: verifiedPermissionsDataSource,
+            runtime: FunctionRuntime.JS_1_0_0,
+            code: Code.fromInline(isAuthorizedBuildResult.text),
+          }
+        );
+
+        const [auth, postAuth, data] = functions;
+
+        return [
+          auth,
+          postAuth,
+          fetchPrincipalAttrs.functionId,
+          data,
+          IsAuthorizedFunction.functionId,
+        ];
+      }
+    );
   }
 
   function isPipelineConfigProperty(

@@ -1,20 +1,20 @@
 permit (
   principal,
   action in [
-    AmplifyAVP::Action::"getProject",
-    AmplifyAVP::Action::"updateProject",
-    AmplifyAVP::Action::"getFolder",
-    AmplifyAVP::Action::"updateFolder",
-    AmplifyAVP::Action::"getFile",
-    AmplifyAVP::Action::"updateFile",
-    AmplifyAVP::Action::"createFolder",
-    AmplifyAVP::Action::"createFile",
-    AmplifyAVP::Action::"createProjectMember",
-    AmplifyAVP::Action::"updateProjectMember",
-    AmplifyAVP::Action::"listProjects",
-    AmplifyAVP::Action::"listFolders",
-    AmplifyAVP::Action::"listFiles",
-    AmplifyAVP::Action::"listProjectMembers"
+    AmplifyAVP::Action::"Query.getProject",
+    AmplifyAVP::Action::"Mutation.updateProject",
+    AmplifyAVP::Action::"Query.getFolder",
+    AmplifyAVP::Action::"Mutation.updateFolder",
+    AmplifyAVP::Action::"Query.getFile",
+    AmplifyAVP::Action::"Mutation.updateFile",
+    AmplifyAVP::Action::"Mutation.createFolder",
+    AmplifyAVP::Action::"Mutation.createFile",
+    AmplifyAVP::Action::"Mutation.createProjectMember",
+    AmplifyAVP::Action::"Mutation.updateProjectMember",
+    AmplifyAVP::Action::"Query.listProjects",
+    AmplifyAVP::Action::"Query.listFolders",
+    AmplifyAVP::Action::"Query.listFiles",
+    AmplifyAVP::Action::"Query.listProjectMembers"
   ],
   resource
 )
