@@ -124,11 +124,7 @@ function buildUser(
 function buildResource(entity: File | Folder | Project): EntityIdentifier {
   return {
     entityId: entity.id,
-    entityType: Object.hasOwn(entity, "folderId")
-      ? `${NAMESPACE}::File`
-      : Object.hasOwn(entity, "projectId")
-        ? `${NAMESPACE}::Folder`
-        : `${NAMESPACE}::Project`,
+    entityType: `${NAMESPACE}::${entity.__typename}`,
   };
 }
 
