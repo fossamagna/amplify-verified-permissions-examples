@@ -4,8 +4,6 @@ import type {
 } from "./verified-permissions/types";
 import { createIsAuthorizedRequest } from "./verified-permissions/createIsAuthorizedRequest";
 
-const NAMESPACE = "AmplifyAVP";
-
 export function request(ctx: Context) {
   if (util.authType() !== "User Pool Authorization") {
     runtime.earlyReturn({});

@@ -1,11 +1,11 @@
 export type IsAuthorizedResponse = {
   decision: "ALLOW" | "DENY";
-  determiningPolicies: Array<{
-    policyId: string;
-  }>;
-  errors?: Array<{
-    errorDescription: string;
-  }>;
+  determiningPolicies: Array<DeterminingPolicyItem>;
+  errors?: Array<EvaluationErrorItem>;
+};
+
+export type EvaluationErrorItem = {
+  errorDescription: string;
 };
 
 export type EntityIdentifier = {
@@ -32,4 +32,42 @@ export type EntityItem = {
 
 export type EntitiesDefinition = {
   entityList: EntityItem[];
+};
+
+export type BatchIsAuthorizedRequest = {
+  entities: EntitiesDefinition;
+  policyStoreId: string;
+  requests: BatchIsAuthorizedInputItem[];
+};
+
+export type ActionIdentifier = {
+  actionId: string;
+  actionType: string;
+};
+
+export type ContextDefinition = {
+  cedarJson?: string;
+  contextMap?: Record<string, AttributeValue>;
+};
+
+export type BatchIsAuthorizedInputItem = {
+  action: ActionIdentifier;
+  context: ContextDefinition;
+  principal: EntityIdentifier;
+  resource: EntityIdentifier;
+};
+
+export type BatchIsAuthorizedOutput = {
+  results: BatchIsAuthorizedOutputItem[];
+};
+
+export type DeterminingPolicyItem = {
+  policyId: string;
+};
+
+export type BatchIsAuthorizedOutputItem = {
+  decision: "ALLOW" | "DENY";
+  determiningPolicies: DeterminingPolicyItem[];
+  errors: EvaluationErrorItem[];
+  request: BatchIsAuthorizedInputItem;
 };

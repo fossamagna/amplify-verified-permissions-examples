@@ -7,14 +7,14 @@ export type ProjectMember = {
 };
 
 export type Project = Pick<Schema["Project"]["type"], "id" | "name"> & {
-  ___typename: "Project";
+  __typename: "Project";
 };
 
 export type Folder = Pick<Schema["Folder"]["type"], "id" | "projectId" | "name"> & {
-  ___typename: "Folder";
+  __typename: "Folder";
 };
 
 export type File = Pick<
   Schema["File"]["type"],
   "id" | "projectId" | "folderId" | "name"
-  > & { ___typename: "File" };
+  > & { __typename: "File" };

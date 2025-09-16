@@ -5,9 +5,47 @@ import type {
   EntityIdentifier,
   AttributeValue,
   EntitiesDefinition,
+  BatchIsAuthorizedRequest,
 } from "./types";
 
 const NAMESPACE = "AmplifyAVP";
+
+export function createBatchIsAuthorizedRequest(
+  ctx: Context
+): BatchIsAuthorizedRequest {
+  const identity = ctx.identity as AppSyncIdentityCognito;
+  const userId = identity.claims.sub;
+  const projectMembers = ctx.stash.userAttributes
+    .projectMembers as ProjectMember[];
+  const policyStoreId = ctx.stash.policyStoreId as string;
+  const actionId = `${ctx.stash.typeName}.${ctx.stash.fieldName}`;
+
+  if (!ctx.prev.result || !ctx.prev.result.items) {
+    runtime.earlyReturn({});
+  }
+
+  const items = ctx.prev.result.items as File[] | Folder[] | Project[];
+  // console.log(`Batch items: ${JSON.stringify(items, null, 2)}`);
+  const entities = items.map((item) => buildEntityList(item).entityList).flat();
+  const resources = items.map((item) => buildResource(item));
+
+  const user = buildUser(userId, projectMembers);
+  return {
+    entities: {
+      entityList: [user, ...entities],
+    },
+    policyStoreId: policyStoreId,
+    requests: resources.map((resource) => ({
+      action: {
+        actionId: actionId,
+        actionType: `${NAMESPACE}::Action`,
+      },
+      context: {},
+      principal: user.identifier,
+      resource,
+    })),
+  };
+}
 
 export function createIsAuthorizedRequest(ctx: Context) {
   const identity = ctx.identity as AppSyncIdentityCognito;
@@ -96,7 +134,7 @@ function buildResource(entity: File | Folder | Project): EntityIdentifier {
 
 function buildEntityList(entity: File | Folder | Project): EntitiesDefinition {
   const entityList: EntityItem[] = [];
-  if (entity.___typename === "File" && entity.folderId) {
+  if (entity.__typename === "File") {
     const file = entity as File;
     const fileEntity: EntityItem = {
       identifier: {
@@ -142,7 +180,7 @@ function buildEntityList(entity: File | Folder | Project): EntitiesDefinition {
         entityType: `${NAMESPACE}::Project`,
       });
     }
-  } else if (entity.___typename === "Folder" && entity.projectId) {
+  } else if (entity.__typename === "Folder") {
     const folder = entity as Folder;
     const folderEntity: EntityItem = {
       identifier: {
@@ -166,7 +204,7 @@ function buildEntityList(entity: File | Folder | Project): EntitiesDefinition {
         entityType: `${NAMESPACE}::Project`,
       });
     }
-  } else if (entity.___typename === "Project") {
+  } else if (entity.__typename === "Project") {
     entityList.push({
       identifier: {
         entityId: entity.id,
@@ -175,6 +213,7 @@ function buildEntityList(entity: File | Folder | Project): EntitiesDefinition {
       attributes: {},
     });
   }
+  // console.log(`Entity List: ${JSON.stringify(entityList, null, 2)}`);
   return {
     entityList,
   };

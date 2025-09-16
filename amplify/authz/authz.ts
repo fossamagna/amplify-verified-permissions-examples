@@ -86,6 +86,58 @@ export function authz(
     }
   );
 
+  function addAuthFunctionsToListResolver(
+    graphqlApi: IGraphqlApi,
+    logicalId: string,
+    resolver: CfnResolver
+  ) {
+    return addAuthFunctionsToResolver(
+      graphqlApi,
+      logicalId,
+      resolver,
+      (functions, construct) => {
+        const idPrefix = logicalId.replaceAll(".", "");
+        const id = `${idPrefix}FetchPrincipalAttrsFn`;
+        const buildResult = build(
+          path.join(__dirname, "resolvers", "fetchPrincipalAttrs.ts")
+        );
+        const fetchPrincipalAttrs = new AppsyncFunction(construct, id, {
+          api: graphqlApi,
+          name: id,
+          dataSource: projectMemberDataSource,
+          runtime: FunctionRuntime.JS_1_0_0,
+          code: Code.fromInline(buildResult.text),
+        });
+
+        const batchIsAuthorizedBuildResult = build(
+          path.join(__dirname, "resolvers", "batchIsAuthorized.ts")
+        );
+        const batchIsAuthorizedFunctionId = `${idPrefix}BatchIsAuthorizedFn`;
+        const batchIsAuthorizedFunction = new AppsyncFunction(
+          construct,
+          batchIsAuthorizedFunctionId,
+          {
+            api: graphqlApi,
+            name: batchIsAuthorizedFunctionId,
+            dataSource: verifiedPermissionsDataSource,
+            runtime: FunctionRuntime.JS_1_0_0,
+            code: Code.fromInline(batchIsAuthorizedBuildResult.text),
+          }
+        );
+
+        const [auth, postAuth, data] = functions;
+
+        return [
+          auth,
+          postAuth,
+          fetchPrincipalAttrs.functionId,
+          data,
+          batchIsAuthorizedFunction.functionId,
+        ];
+      }
+    );
+  }
+
   function addAuthFunctionsToResolvers(
     graphqlApi: IGraphqlApi,
     logicalId: string,
@@ -94,7 +146,7 @@ export function authz(
     if (logicalId.startsWith("Query.get")) {
       addAuthFunctionsToGetResolver(graphqlApi, logicalId, resolver);
     } else if (logicalId.startsWith("Query.list")) {
-      //addAuthFunctionsToListResolver(graphqlApi, logicalId, resolver);
+      addAuthFunctionsToListResolver(graphqlApi, logicalId, resolver);
     } else if (logicalId.startsWith("Mutation.")) {
       //addAuthFunctionsToMutationResolver(graphqlApi, logicalId, resolver);
     } else if (logicalId.startsWith("Subscription.")) {
