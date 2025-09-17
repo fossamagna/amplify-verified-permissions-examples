@@ -9,6 +9,8 @@ import {
   HttpDataSource,
   FunctionRuntime,
   IGraphqlApi,
+  CfnFunctionConfiguration,
+  CfnDataSource,
 } from "aws-cdk-lib/aws-appsync";
 import { IResolvable, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
@@ -23,10 +25,80 @@ const responseMappingTemplate = `#if($ctx.stash.userAttributes)
 $util.toJson($ctx.prev.result)
 `;
 
-export function addAuthFunctionsToListResolver(
+export function addAuthFunctionsToResolvers(
   graphqlApi: IGraphqlApi,
   logicalId: string,
   resolver: CfnResolver,
+  cfnDataSources: Record<string, CfnDataSource>,
+  policyStoreId: string,
+  verifiedPermissionsDataSource: HttpDataSource,
+  projectMemberDataSource: DynamoDbDataSource
+) {
+  if (logicalId.startsWith("Query.get")) {
+    addAuthFunctionsToGetResolver(
+      graphqlApi,
+      logicalId,
+      resolver,
+      cfnDataSources,
+      policyStoreId,
+      verifiedPermissionsDataSource,
+      projectMemberDataSource
+    );
+  } else if (logicalId.startsWith("Query.list")) {
+    addAuthFunctionsToListResolver(
+      graphqlApi,
+      logicalId,
+      resolver,
+      cfnDataSources,
+      policyStoreId,
+      verifiedPermissionsDataSource,
+      projectMemberDataSource
+    );
+  } else if (logicalId.startsWith("Mutation.create")) {
+    // addAuthFunctionsToCreateResolver(graphqlApi,
+    //   logicalId,
+    //   resolver,
+    //   policyStoreId,
+    //   verifiedPermissionsDataSource,
+    //   projectMemberDataSource
+    // );
+  } else if (logicalId.startsWith("Mutation.update")) { 
+    addAuthFunctionsToUpdateResolver(graphqlApi,
+      logicalId,
+      resolver,
+      cfnDataSources,
+      policyStoreId,
+      verifiedPermissionsDataSource,
+      projectMemberDataSource
+    );
+  } else if (logicalId.startsWith("Mutation.delete")) {
+    // addAuthFunctionsToDeleteResolver(graphqlApi,
+    //   logicalId,
+    //   resolver,
+    //   policyStoreId,
+    //   verifiedPermissionsDataSource,
+    //   projectMemberDataSource
+    // );
+  } else if (logicalId.startsWith("Subscription.")) {
+    //addAuthFunctionsToSubscriptionResolver(graphqlApi, logicalId, resolver);
+  } else {
+    addAuthFunctionsToDefaultResolver(
+      graphqlApi,
+      logicalId,
+      resolver,
+      cfnDataSources,
+      policyStoreId,
+      verifiedPermissionsDataSource,
+      projectMemberDataSource
+    );
+  }
+}
+
+function addAuthFunctionsToListResolver(
+  graphqlApi: IGraphqlApi,
+  logicalId: string,
+  resolver: CfnResolver,
+  cfnDataSources: Record<string, CfnDataSource>,
   policyStoreId: string,
   verifiedPermissionsDataSource: HttpDataSource,
   projectMemberDataSource: DynamoDbDataSource
@@ -35,6 +107,7 @@ export function addAuthFunctionsToListResolver(
     graphqlApi,
     logicalId,
     resolver,
+    cfnDataSources,
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");
@@ -79,52 +152,11 @@ export function addAuthFunctionsToListResolver(
   );
 }
 
-export function addAuthFunctionsToResolvers(
-  graphqlApi: IGraphqlApi,
-  logicalId: string,
-  resolver: CfnResolver,
-  policyStoreId: string,
-  verifiedPermissionsDataSource: HttpDataSource,
-  projectMemberDataSource: DynamoDbDataSource
-) {
-  if (logicalId.startsWith("Query.get")) {
-    addAuthFunctionsToGetResolver(
-      graphqlApi,
-      logicalId,
-      resolver,
-      policyStoreId,
-      verifiedPermissionsDataSource,
-      projectMemberDataSource
-    );
-  } else if (logicalId.startsWith("Query.list")) {
-    addAuthFunctionsToListResolver(
-      graphqlApi,
-      logicalId,
-      resolver,
-      policyStoreId,
-      verifiedPermissionsDataSource,
-      projectMemberDataSource
-    );
-  } else if (logicalId.startsWith("Mutation.")) {
-    //addAuthFunctionsToMutationResolver(graphqlApi, logicalId, resolver);
-  } else if (logicalId.startsWith("Subscription.")) {
-    //addAuthFunctionsToSubscriptionResolver(graphqlApi, logicalId, resolver);
-  } else {
-    addAuthFunctionsToDefaultResolver(
-      graphqlApi,
-      logicalId,
-      resolver,
-      policyStoreId,
-      verifiedPermissionsDataSource,
-      projectMemberDataSource
-    );
-  }
-}
-
 function addAuthFunctionsToDefaultResolver(
   graphqlApi: IGraphqlApi,
   logicalId: string,
   resolver: CfnResolver,
+  cfnDataSources: Record<string, CfnDataSource>,
   policyStoreId: string,
   verifiedPermissionsDataSource: HttpDataSource,
   projectMemberDataSource: DynamoDbDataSource
@@ -133,6 +165,7 @@ function addAuthFunctionsToDefaultResolver(
     graphqlApi,
     logicalId,
     resolver,
+    cfnDataSources,
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");
@@ -184,6 +217,7 @@ function addAuthFunctionsToResolver(
   graphqlApi: IGraphqlApi,
   logicalId: string,
   resolver: CfnResolver,
+  cfnDataSources: Record<string, CfnDataSource>,
   policyStoreId: string,
   appender: (functions: string[], construct: Construct) => string[]
 ) {
@@ -209,10 +243,11 @@ function addAuthFunctionsToResolver(
 ${resolver.requestMappingTemplate}`;
 }
 
-function addAuthFunctionsToGetResolver(
+function addAuthFunctionsToUpdateResolver(
   graphqlApi: IGraphqlApi,
   logicalId: string,
   resolver: CfnResolver,
+  cfnDataSources: Record<string, CfnDataSource>,
   policyStoreId: string,
   verifiedPermissionsDataSource: HttpDataSource,
   projectMemberDataSource: DynamoDbDataSource
@@ -221,6 +256,94 @@ function addAuthFunctionsToGetResolver(
     graphqlApi,
     logicalId,
     resolver,
+    cfnDataSources,
+    policyStoreId,
+    (functions, construct) => {
+      const idPrefix = logicalId.replaceAll(".", "");
+      const fetchPrincipalAttrsId = `${idPrefix}FetchPrincipalAttrsFn`;
+      const buildResult = build(
+        path.join(resolversDir, "fetchPrincipalAttrs.ts")
+      );
+      const fetchPrincipalAttrs = new AppsyncFunction(
+        construct,
+        fetchPrincipalAttrsId,
+        {
+          api: graphqlApi,
+          name: fetchPrincipalAttrsId,
+          dataSource: projectMemberDataSource,
+          runtime: FunctionRuntime.JS_1_0_0,
+          code: Code.fromInline(buildResult.text),
+        }
+      );
+
+      const isAuthorizedBuildResult = build(
+        path.join(resolversDir, "isAuthorized.ts")
+      );
+      const isAuthorizedFunctionId = `${idPrefix}IsAuthorizedFn`;
+      const isAuthorizedFunction = new AppsyncFunction(
+        construct,
+        isAuthorizedFunctionId,
+        {
+          api: graphqlApi,
+          name: isAuthorizedFunctionId,
+          dataSource: verifiedPermissionsDataSource,
+          runtime: FunctionRuntime.JS_1_0_0,
+          code: Code.fromInline(isAuthorizedBuildResult.text),
+        }
+      );
+
+      const dataSourceName = logicalId.replaceAll("Mutation.update", "") + "Table";
+      const dataSource = cfnDataSources[dataSourceName];
+      if (!dataSource) {
+        throw new Error(
+          `DataSource ${dataSourceName} not found for resolver ${logicalId}`
+        );
+      }
+
+      const getItemBuildResult = build(
+        path.join(resolversDir, "getItem.ts")
+      );
+      const getItemFunctionId = `${idPrefix}GetItemFn`;
+      const getItemFunction = new CfnFunctionConfiguration(construct, getItemFunctionId, {
+        apiId: graphqlApi.apiId,
+        name: getItemFunctionId,
+        functionVersion: "2018-05-29",
+        dataSourceName: dataSource.name,
+        runtime: {
+          name: "APPSYNC_JS",
+          runtimeVersion: "1.0.0",
+        },
+        code: getItemBuildResult.text,
+      });
+
+      const data = functions[functions.length - 1];
+      const pres = functions.slice(0, -1);
+
+      return [
+        ...pres,
+        fetchPrincipalAttrs.functionId,
+        getItemFunction.attrFunctionId,
+        isAuthorizedFunction.functionId,
+        data,
+      ];
+    }
+  );
+}
+
+function addAuthFunctionsToGetResolver(
+  graphqlApi: IGraphqlApi,
+  logicalId: string,
+  resolver: CfnResolver,
+  cfnDataSources: Record<string, CfnDataSource>,
+  policyStoreId: string,
+  verifiedPermissionsDataSource: HttpDataSource,
+  projectMemberDataSource: DynamoDbDataSource
+) {
+  return addAuthFunctionsToResolver(
+    graphqlApi,
+    logicalId,
+    resolver,
+    cfnDataSources,
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");

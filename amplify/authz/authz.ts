@@ -57,6 +57,9 @@ export function authz(
     }
   );
 
+  Object.keys(data.resources.cfnResources.cfnDataSources).forEach((name) => {
+    console.log(`DataSource for ${name}`);
+  });
   Object.entries(data.resources.cfnResources.cfnResolvers).forEach(
     ([name, resolver]) => {
       console.log(`Resolver for ${name}`);
@@ -64,6 +67,7 @@ export function authz(
         data.resources.graphqlApi,
         name,
         resolver,
+        data.resources.cfnResources.cfnDataSources,
         policyStore.policyStore.attrPolicyStoreId,
         verifiedPermissionsDataSource,
         projectMemberDataSource
