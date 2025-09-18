@@ -1,29 +1,18 @@
-
-import path from "node:path";
-
 import {
-  AppsyncFunction,
   CfnResolver,
-  Code,
   DynamoDbDataSource,
   HttpDataSource,
-  FunctionRuntime,
   IGraphqlApi,
-  CfnFunctionConfiguration,
   CfnDataSource,
 } from "aws-cdk-lib/aws-appsync";
 import { IResolvable, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
-import { build } from "../build";
-
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
-const resolversDir = path.join(__dirname, "..", "resolvers");
-
-const responseMappingTemplate = `#if($ctx.stash.userAttributes)
-  #set($ctx.prev.result.userAttributes = $ctx.stash.userAttributes)
-#end
-$util.toJson($ctx.prev.result)
-`;
+import {
+  createBatchIsAuthorizedFunction,
+  createFetchPrincipalAttrsFunction,
+  createGetItemFunction,
+  createIsAuthorizedFunction,
+} from "./createAppSyncFunctions";
 
 export function addAuthFunctionsToResolvers(
   graphqlApi: IGraphqlApi,
@@ -62,8 +51,9 @@ export function addAuthFunctionsToResolvers(
     //   verifiedPermissionsDataSource,
     //   projectMemberDataSource
     // );
-  } else if (logicalId.startsWith("Mutation.update")) { 
-    addAuthFunctionsToUpdateResolver(graphqlApi,
+  } else if (logicalId.startsWith("Mutation.update")) {
+    addAuthFunctionsToUpdateResolver(
+      graphqlApi,
       logicalId,
       resolver,
       cfnDataSources,
@@ -75,6 +65,7 @@ export function addAuthFunctionsToResolvers(
     // addAuthFunctionsToDeleteResolver(graphqlApi,
     //   logicalId,
     //   resolver,
+    //   cfnDataSources,
     //   policyStoreId,
     //   verifiedPermissionsDataSource,
     //   projectMemberDataSource
@@ -111,32 +102,17 @@ function addAuthFunctionsToListResolver(
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");
-      const id = `${idPrefix}FetchPrincipalAttrsFn`;
-      const buildResult = build(
-        path.join(resolversDir, "fetchPrincipalAttrs.ts")
-      );
-      const fetchPrincipalAttrs = new AppsyncFunction(construct, id, {
-        api: graphqlApi,
-        name: id,
-        dataSource: projectMemberDataSource,
-        runtime: FunctionRuntime.JS_1_0_0,
-        code: Code.fromInline(buildResult.text),
-      });
-
-      const batchIsAuthorizedBuildResult = build(
-        path.join(resolversDir, "batchIsAuthorized.ts")
-      );
-      const batchIsAuthorizedFunctionId = `${idPrefix}BatchIsAuthorizedFn`;
-      const batchIsAuthorizedFunction = new AppsyncFunction(
+      const fetchPrincipalAttrs = createFetchPrincipalAttrsFunction(
         construct,
-        batchIsAuthorizedFunctionId,
-        {
-          api: graphqlApi,
-          name: batchIsAuthorizedFunctionId,
-          dataSource: verifiedPermissionsDataSource,
-          runtime: FunctionRuntime.JS_1_0_0,
-          code: Code.fromInline(batchIsAuthorizedBuildResult.text),
-        }
+        idPrefix,
+        graphqlApi,
+        projectMemberDataSource
+      );
+      const batchIsAuthorizedFunction = createBatchIsAuthorizedFunction(
+        construct,
+        idPrefix,
+        graphqlApi,
+        verifiedPermissionsDataSource
       );
 
       const [auth, postAuth, data] = functions;
@@ -169,45 +145,25 @@ function addAuthFunctionsToDefaultResolver(
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");
-      const buildResult = build(
-        path.join(resolversDir, "fetchPrincipalAttrs.ts")
-      );
-      const fetchPrincipalAttrsId = `${idPrefix}FetchPrincipalAttrsFn`;
-      const fetchPrincipalAttrs = new AppsyncFunction(
+      const fetchPrincipalAttrs = createFetchPrincipalAttrsFunction(
         construct,
-        fetchPrincipalAttrsId,
-        {
-          api: graphqlApi,
-          name: fetchPrincipalAttrsId,
-          dataSource: projectMemberDataSource,
-          runtime: FunctionRuntime.JS_1_0_0,
-          code: Code.fromInline(buildResult.text),
-        }
+        idPrefix,
+        graphqlApi,
+        projectMemberDataSource
       );
-
-      const isAuthorizedBuildResult = build(
-        path.join(resolversDir, "isAuthorized.ts")
-      );
-      const IsAuthorizedFunctionId = `${idPrefix}IsAuthorizedFn`;
-      const IsAuthorizedFunction = new AppsyncFunction(
+      const isAuthorizedFunction = createIsAuthorizedFunction(
         construct,
-        IsAuthorizedFunctionId,
-        {
-          api: graphqlApi,
-          name: IsAuthorizedFunctionId,
-          dataSource: verifiedPermissionsDataSource,
-          runtime: FunctionRuntime.JS_1_0_0,
-          code: Code.fromInline(isAuthorizedBuildResult.text),
-        }
+        idPrefix,
+        graphqlApi,
+        verifiedPermissionsDataSource
       );
-
       const preFunctions = functions.slice(0, -1);
       const dataFunction = functions[functions.length - 1];
       return [
         ...preFunctions,
         fetchPrincipalAttrs.functionId,
         dataFunction,
-        IsAuthorizedFunction.functionId,
+        isAuthorizedFunction.functionId,
       ];
     }
   );
@@ -238,6 +194,11 @@ function addAuthFunctionsToResolver(
   resolver.addPropertyOverride("PipelineConfig.Functions", appendedFunctions);
   // Set the response mapping template
   // To reference userAttributes via `ctx.source` in child resolver.
+  const responseMappingTemplate = `#if($ctx.stash.userAttributes)
+  #set($ctx.prev.result.userAttributes = $ctx.stash.userAttributes)
+#end
+$util.toJson($ctx.prev.result)
+`;
   resolver.responseMappingTemplate = responseMappingTemplate;
   resolver.requestMappingTemplate = `$util.qr($ctx.stash.put("policyStoreId", "${policyStoreId}"))
 ${resolver.requestMappingTemplate}`;
@@ -260,67 +221,30 @@ function addAuthFunctionsToUpdateResolver(
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");
-      const fetchPrincipalAttrsId = `${idPrefix}FetchPrincipalAttrsFn`;
-      const buildResult = build(
-        path.join(resolversDir, "fetchPrincipalAttrs.ts")
-      );
-      const fetchPrincipalAttrs = new AppsyncFunction(
+      const fetchPrincipalAttrs = createFetchPrincipalAttrsFunction(
         construct,
-        fetchPrincipalAttrsId,
-        {
-          api: graphqlApi,
-          name: fetchPrincipalAttrsId,
-          dataSource: projectMemberDataSource,
-          runtime: FunctionRuntime.JS_1_0_0,
-          code: Code.fromInline(buildResult.text),
-        }
+        idPrefix,
+        graphqlApi,
+        projectMemberDataSource
       );
-
-      const isAuthorizedBuildResult = build(
-        path.join(resolversDir, "isAuthorized.ts")
-      );
-      const isAuthorizedFunctionId = `${idPrefix}IsAuthorizedFn`;
-      const isAuthorizedFunction = new AppsyncFunction(
+      const isAuthorizedFunction = createIsAuthorizedFunction(
         construct,
-        isAuthorizedFunctionId,
-        {
-          api: graphqlApi,
-          name: isAuthorizedFunctionId,
-          dataSource: verifiedPermissionsDataSource,
-          runtime: FunctionRuntime.JS_1_0_0,
-          code: Code.fromInline(isAuthorizedBuildResult.text),
-        }
+        idPrefix,
+        graphqlApi,
+        verifiedPermissionsDataSource
       );
-
-      const dataSourceName = logicalId.replaceAll("Mutation.update", "") + "Table";
-      const dataSource = cfnDataSources[dataSourceName];
-      if (!dataSource) {
-        throw new Error(
-          `DataSource ${dataSourceName} not found for resolver ${logicalId}`
-        );
-      }
-
-      const getItemBuildResult = build(
-        path.join(resolversDir, "getItem.ts")
+      const getItemFunction = createGetItemFunction(
+        construct,
+        logicalId,
+        graphqlApi,
+        cfnDataSources
       );
-      const getItemFunctionId = `${idPrefix}GetItemFn`;
-      const getItemFunction = new CfnFunctionConfiguration(construct, getItemFunctionId, {
-        apiId: graphqlApi.apiId,
-        name: getItemFunctionId,
-        functionVersion: "2018-05-29",
-        dataSourceName: dataSource.name,
-        runtime: {
-          name: "APPSYNC_JS",
-          runtimeVersion: "1.0.0",
-        },
-        code: getItemBuildResult.text,
-      });
 
       const data = functions[functions.length - 1];
-      const pres = functions.slice(0, -1);
+      const preFunctions = functions.slice(0, -1);
 
       return [
-        ...pres,
+        ...preFunctions,
         fetchPrincipalAttrs.functionId,
         getItemFunction.attrFunctionId,
         isAuthorizedFunction.functionId,
@@ -347,32 +271,17 @@ function addAuthFunctionsToGetResolver(
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");
-      const id = `${idPrefix}FetchPrincipalAttrsFn`;
-      const buildResult = build(
-        path.join(resolversDir, "fetchPrincipalAttrs.ts")
-      );
-      const fetchPrincipalAttrs = new AppsyncFunction(construct, id, {
-        api: graphqlApi,
-        name: id,
-        dataSource: projectMemberDataSource,
-        runtime: FunctionRuntime.JS_1_0_0,
-        code: Code.fromInline(buildResult.text),
-      });
-
-      const isAuthorizedBuildResult = build(
-        path.join(resolversDir, "isAuthorized.ts")
-      );
-      const IsAuthorizedFunctionId = `${idPrefix}IsAuthorizedFn`;
-      const IsAuthorizedFunction = new AppsyncFunction(
+      const fetchPrincipalAttrs = createFetchPrincipalAttrsFunction(
         construct,
-        IsAuthorizedFunctionId,
-        {
-          api: graphqlApi,
-          name: IsAuthorizedFunctionId,
-          dataSource: verifiedPermissionsDataSource,
-          runtime: FunctionRuntime.JS_1_0_0,
-          code: Code.fromInline(isAuthorizedBuildResult.text),
-        }
+        idPrefix,
+        graphqlApi,
+        projectMemberDataSource
+      );
+      const isAuthorizedFunction = createIsAuthorizedFunction(
+        construct,
+        idPrefix,
+        graphqlApi,
+        verifiedPermissionsDataSource
       );
 
       const [auth, postAuth, data] = functions;
@@ -382,7 +291,7 @@ function addAuthFunctionsToGetResolver(
         postAuth,
         fetchPrincipalAttrs.functionId,
         data,
-        IsAuthorizedFunction.functionId,
+        isAuthorizedFunction.functionId,
       ];
     }
   );
