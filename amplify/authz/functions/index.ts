@@ -62,14 +62,14 @@ export function addAuthFunctionsToResolvers(
       projectMemberDataSource
     );
   } else if (logicalId.startsWith("Mutation.delete")) {
-    // addAuthFunctionsToDeleteResolver(graphqlApi,
-    //   logicalId,
-    //   resolver,
-    //   cfnDataSources,
-    //   policyStoreId,
-    //   verifiedPermissionsDataSource,
-    //   projectMemberDataSource
-    // );
+    addAuthFunctionsToDeleteResolver(graphqlApi,
+      logicalId,
+      resolver,
+      cfnDataSources,
+      policyStoreId,
+      verifiedPermissionsDataSource,
+      projectMemberDataSource
+    );
   } else if (logicalId.startsWith("Subscription.")) {
     //addAuthFunctionsToSubscriptionResolver(graphqlApi, logicalId, resolver);
   } else {
@@ -205,6 +205,56 @@ ${resolver.requestMappingTemplate}`;
 }
 
 function addAuthFunctionsToUpdateResolver(
+  graphqlApi: IGraphqlApi,
+  logicalId: string,
+  resolver: CfnResolver,
+  cfnDataSources: Record<string, CfnDataSource>,
+  policyStoreId: string,
+  verifiedPermissionsDataSource: HttpDataSource,
+  projectMemberDataSource: DynamoDbDataSource
+) {
+  return addAuthFunctionsToResolver(
+    graphqlApi,
+    logicalId,
+    resolver,
+    cfnDataSources,
+    policyStoreId,
+    (functions, construct) => {
+      const idPrefix = logicalId.replaceAll(".", "");
+      const fetchPrincipalAttrs = createFetchPrincipalAttrsFunction(
+        construct,
+        idPrefix,
+        graphqlApi,
+        projectMemberDataSource
+      );
+      const isAuthorizedFunction = createIsAuthorizedFunction(
+        construct,
+        idPrefix,
+        graphqlApi,
+        verifiedPermissionsDataSource
+      );
+      const getItemFunction = createGetItemFunction(
+        construct,
+        logicalId,
+        graphqlApi,
+        cfnDataSources
+      );
+
+      const data = functions[functions.length - 1];
+      const preFunctions = functions.slice(0, -1);
+
+      return [
+        ...preFunctions,
+        fetchPrincipalAttrs.functionId,
+        getItemFunction.attrFunctionId,
+        isAuthorizedFunction.functionId,
+        data,
+      ];
+    }
+  );
+}
+
+function addAuthFunctionsToDeleteResolver(
   graphqlApi: IGraphqlApi,
   logicalId: string,
   resolver: CfnResolver,
