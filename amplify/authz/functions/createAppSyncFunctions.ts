@@ -10,7 +10,10 @@ import {
 } from "aws-cdk-lib/aws-appsync";
 import { Construct } from "constructs";
 import { build } from "../build";
-import { getCfnDataSourceFromResolverLogicalId } from "./getCfnDataSourceFromResolverLogicalId";
+import {
+  getCfnDataSourceToCreateFromResolverLogicalId,
+  getCfnDataSourceToUpdateAndDeleteFromResolverLogicalId,
+} from "./getCfnDataSourceFromResolverLogicalId";
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const resolversDir = path.join(__dirname, "..", "resolvers");
@@ -87,7 +90,7 @@ export function createGetItemFunction(
   graphqlApi: IGraphqlApi,
   cfnDataSources: Record<string, CfnDataSource>
 ) {
-  const dataSource = getCfnDataSourceFromResolverLogicalId(
+  const dataSource = getCfnDataSourceToUpdateAndDeleteFromResolverLogicalId(
     logicalId,
     cfnDataSources
   );
@@ -110,6 +113,37 @@ export function createGetItemFunction(
     }
   );
   return getItemFunction;
+}
+
+export function createGetParentFunction(
+  construct: Construct,
+  logicalId: string,
+  graphqlApi: IGraphqlApi,
+  cfnDataSources: Record<string, CfnDataSource>
+) {
+  const dataSource = getCfnDataSourceToCreateFromResolverLogicalId(
+    logicalId,
+    cfnDataSources
+  );
+  const idPrefix = createIdPrefix(logicalId);
+  const getParentBuildResult = build(path.join(resolversDir, "getParent.ts"));
+  const getParentFunctionId = `${idPrefix}GetParentFn`;
+  const getParentFunction = new CfnFunctionConfiguration(
+    construct,
+    getParentFunctionId,
+    {
+      apiId: graphqlApi.apiId,
+      name: getParentFunctionId,
+      functionVersion: "2018-05-29",
+      dataSourceName: dataSource ? dataSource.name : "NONE_DS",
+      runtime: {
+        name: "APPSYNC_JS",
+        runtimeVersion: "1.0.0",
+      },
+      code: getParentBuildResult.text,
+    }
+  );
+  return getParentFunction;
 }
 
 function createIdPrefix(logicalId: string) {

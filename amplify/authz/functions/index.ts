@@ -11,6 +11,7 @@ import {
   createBatchIsAuthorizedFunction,
   createFetchPrincipalAttrsFunction,
   createGetItemFunction,
+  createGetParentFunction,
   createIsAuthorizedFunction,
 } from "./createAppSyncFunctions";
 
@@ -44,13 +45,15 @@ export function addAuthFunctionsToResolvers(
       projectMemberDataSource
     );
   } else if (logicalId.startsWith("Mutation.create")) {
-    // addAuthFunctionsToCreateResolver(graphqlApi,
-    //   logicalId,
-    //   resolver,
-    //   policyStoreId,
-    //   verifiedPermissionsDataSource,
-    //   projectMemberDataSource
-    // );
+    addAuthFunctionsToCreateResolver(
+      graphqlApi,
+      logicalId,
+      resolver,
+      cfnDataSources,
+      policyStoreId,
+      verifiedPermissionsDataSource,
+      projectMemberDataSource
+    );
   } else if (logicalId.startsWith("Mutation.update")) {
     addAuthFunctionsToUpdateResolver(
       graphqlApi,
@@ -62,7 +65,8 @@ export function addAuthFunctionsToResolvers(
       projectMemberDataSource
     );
   } else if (logicalId.startsWith("Mutation.delete")) {
-    addAuthFunctionsToDeleteResolver(graphqlApi,
+    addAuthFunctionsToDeleteResolver(
+      graphqlApi,
       logicalId,
       resolver,
       cfnDataSources,
@@ -202,6 +206,56 @@ $util.toJson($ctx.prev.result)
   resolver.responseMappingTemplate = responseMappingTemplate;
   resolver.requestMappingTemplate = `$util.qr($ctx.stash.put("policyStoreId", "${policyStoreId}"))
 ${resolver.requestMappingTemplate}`;
+}
+
+function addAuthFunctionsToCreateResolver(
+  graphqlApi: IGraphqlApi,
+  logicalId: string,
+  resolver: CfnResolver,
+  cfnDataSources: Record<string, CfnDataSource>,
+  policyStoreId: string,
+  verifiedPermissionsDataSource: HttpDataSource,
+  projectMemberDataSource: DynamoDbDataSource
+) {
+  return addAuthFunctionsToResolver(
+    graphqlApi,
+    logicalId,
+    resolver,
+    cfnDataSources,
+    policyStoreId,
+    (functions, construct) => {
+      const idPrefix = logicalId.replaceAll(".", "");
+      const fetchPrincipalAttrs = createFetchPrincipalAttrsFunction(
+        construct,
+        idPrefix,
+        graphqlApi,
+        projectMemberDataSource
+      );
+      const isAuthorizedFunction = createIsAuthorizedFunction(
+        construct,
+        idPrefix,
+        graphqlApi,
+        verifiedPermissionsDataSource
+      );
+      const getParentFunction = createGetParentFunction(
+        construct,
+        logicalId,
+        graphqlApi,
+        cfnDataSources
+      );
+
+      const data = functions[functions.length - 1];
+      const preFunctions = functions.slice(0, -1);
+
+      return [
+        ...preFunctions,
+        fetchPrincipalAttrs.functionId,
+        getParentFunction.attrFunctionId,
+        isAuthorizedFunction.functionId,
+        data,
+      ];
+    }
+  );
 }
 
 function addAuthFunctionsToUpdateResolver(
