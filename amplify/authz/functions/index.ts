@@ -5,11 +5,13 @@ import {
   IGraphqlApi,
   CfnDataSource,
 } from "aws-cdk-lib/aws-appsync";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { IResolvable, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import {
   createBatchIsAuthorizedFunction,
   createFetchPrincipalAttrsFunction,
+  createGetItemFromModelFilterFunction,
   createGetItemFunction,
   createGetParentFunction,
   createIsAuthorizedFunction,
@@ -20,6 +22,7 @@ export function addAuthFunctionsToResolvers(
   logicalId: string,
   resolver: CfnResolver,
   cfnDataSources: Record<string, CfnDataSource>,
+  tables: Record<string, dynamodb.ITable>,
   policyStoreId: string,
   verifiedPermissionsDataSource: HttpDataSource,
   projectMemberDataSource: DynamoDbDataSource
@@ -75,7 +78,16 @@ export function addAuthFunctionsToResolvers(
       projectMemberDataSource
     );
   } else if (logicalId.startsWith("Subscription.")) {
-    //addAuthFunctionsToSubscriptionResolver(graphqlApi, logicalId, resolver);
+    addAuthFunctionsToSubscriptionResolver(
+      graphqlApi,
+      logicalId,
+      resolver,
+      cfnDataSources,
+      tables,
+      policyStoreId,
+      verifiedPermissionsDataSource,
+      projectMemberDataSource
+    );
   } else {
     addAuthFunctionsToDefaultResolver(
       graphqlApi,
@@ -103,6 +115,7 @@ function addAuthFunctionsToListResolver(
     logicalId,
     resolver,
     cfnDataSources,
+    {},
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");
@@ -146,6 +159,7 @@ function addAuthFunctionsToDefaultResolver(
     logicalId,
     resolver,
     cfnDataSources,
+    {},
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");
@@ -178,6 +192,7 @@ function addAuthFunctionsToResolver(
   logicalId: string,
   resolver: CfnResolver,
   cfnDataSources: Record<string, CfnDataSource>,
+  tables: Record<string, dynamodb.ITable>,
   policyStoreId: string,
   appender: (functions: string[], construct: Construct) => string[]
 ) {
@@ -197,6 +212,15 @@ function addAuthFunctionsToResolver(
   const appendedFunctions = appender(functions, stack);
   resolver.addPropertyOverride("PipelineConfig.Functions", appendedFunctions);
   // Set the response mapping template
+
+  const tableMap = Object.entries(tables).reduce(
+    (acc, [key, table]) => {
+      acc[key] = table.tableName;
+      return acc;
+    },
+    {} as Record<string, string>
+  );
+
   // To reference userAttributes via `ctx.source` in child resolver.
   const responseMappingTemplate = `#if($ctx.stash.userAttributes)
   #set($ctx.prev.result.userAttributes = $ctx.stash.userAttributes)
@@ -205,6 +229,7 @@ $util.toJson($ctx.prev.result)
 `;
   resolver.responseMappingTemplate = responseMappingTemplate;
   resolver.requestMappingTemplate = `$util.qr($ctx.stash.put("policyStoreId", "${policyStoreId}"))
+$util.qr($ctx.stash.put("tables", ${JSON.stringify(tableMap)}))
 ${resolver.requestMappingTemplate}`;
 }
 
@@ -222,6 +247,7 @@ function addAuthFunctionsToCreateResolver(
     logicalId,
     resolver,
     cfnDataSources,
+    {},
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");
@@ -272,6 +298,7 @@ function addAuthFunctionsToUpdateResolver(
     logicalId,
     resolver,
     cfnDataSources,
+    {},
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");
@@ -322,6 +349,7 @@ function addAuthFunctionsToDeleteResolver(
     logicalId,
     resolver,
     cfnDataSources,
+    {},
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");
@@ -372,6 +400,7 @@ function addAuthFunctionsToGetResolver(
     logicalId,
     resolver,
     cfnDataSources,
+    {},
     policyStoreId,
     (functions, construct) => {
       const idPrefix = logicalId.replaceAll(".", "");
@@ -398,6 +427,85 @@ function addAuthFunctionsToGetResolver(
         isAuthorizedFunction.functionId,
       ];
     }
+  );
+}
+
+function addAuthFunctionsToSubscriptionResolver(
+  graphqlApi: IGraphqlApi,
+  logicalId: string,
+  resolver: CfnResolver,
+  cfnDataSources: Record<string, CfnDataSource>,
+  tables: Record<string, dynamodb.ITable>,
+  policyStoreId: string,
+  verifiedPermissionsDataSource: HttpDataSource,
+  projectMemberDataSource: DynamoDbDataSource
+) {
+  const filteredTables = filterTables(logicalId, tables);
+  return addAuthFunctionsToResolver(
+    graphqlApi,
+    logicalId,
+    resolver,
+    cfnDataSources,
+    filteredTables,
+    policyStoreId,
+    (functions, construct) => {
+      const idPrefix = logicalId.replaceAll(".", "");
+      const fetchPrincipalAttrs = createFetchPrincipalAttrsFunction(
+        construct,
+        idPrefix,
+        graphqlApi,
+        projectMemberDataSource
+      );
+      const isAuthorizedFunction = createIsAuthorizedFunction(
+        construct,
+        idPrefix,
+        graphqlApi,
+        verifiedPermissionsDataSource
+      );
+
+      const getItemFromModelFilterFunction =
+        createGetItemFromModelFilterFunction(
+          construct,
+          idPrefix,
+          graphqlApi,
+          verifiedPermissionsDataSource
+        );
+
+      const data = functions[functions.length - 1];
+      const preFunctions = functions.slice(0, -1);
+
+      return [
+        ...preFunctions,
+        fetchPrincipalAttrs.functionId,
+        getItemFromModelFilterFunction.functionId,
+        isAuthorizedFunction.functionId,
+        data,
+      ];
+    }
+  );
+}
+
+function filterTables(
+  logicalId: string,
+  tables: Record<string, dynamodb.ITable>
+) {
+  const subscriptionEntitiesInHierarchy: Record<string, string[]> = {
+    Project: ["Project"],
+    Folder: ["Folder", "Project"],
+    File: ["File", "Folder", "Project"],
+  };
+  const [, fieldName] = logicalId.split(".");
+  const entityName = fieldName.replace(/^on(Create|Update|Delete)/, "");
+  const entities = subscriptionEntitiesInHierarchy[entityName];
+  if (!entities) {
+    return {};
+  }
+  return entities.reduce(
+    (acc, entityName) => {
+      acc[entityName] = tables[entityName];
+      return acc;
+    },
+    {} as Record<string, dynamodb.ITable>
   );
 }
 

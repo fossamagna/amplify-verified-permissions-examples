@@ -68,6 +68,7 @@ export function authz(
         name,
         resolver,
         data.resources.cfnResources.cfnDataSources,
+        data.resources.tables,
         policyStore.policyStore.attrPolicyStoreId,
         verifiedPermissionsDataSource,
         projectMemberDataSource

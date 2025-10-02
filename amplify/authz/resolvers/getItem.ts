@@ -1,18 +1,17 @@
 import type { Context } from '@aws-appsync/utils';
-import * as ddb from '@aws-appsync/utils/dynamodb';
 
 export function request(ctx: Context) {
   if (util.authType() !== "User Pool Authorization") {
-    runtime.earlyReturn({});
+    runtime.earlyReturn(ctx.prev.result);
   }
-  const key =
-    ctx.stash?.metadata?.modelObjectKey
-      ? ctx.stash.metadata.modelObjectKey
-      : { id: ctx.args.input.id };
 
-  return ddb.get({
-    key
-  });
+  return {
+    operation : "GetItem",
+    key : ctx.stash?.metadata?.modelObjectKey
+      ? ctx.stash.metadata.modelObjectKey
+      : util.dynamodb.toMapValues({ id: ctx.args.input.id }),
+    consistentRead : true
+  }
 }
 
 export function response(ctx: Context) {

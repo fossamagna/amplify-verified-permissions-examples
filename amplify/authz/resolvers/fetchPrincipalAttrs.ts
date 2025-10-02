@@ -9,11 +9,11 @@ type ProjectMember = {
 
 export function request(ctx: Context) {
   if (util.authType() !== "User Pool Authorization") {
-    runtime.earlyReturn({});
+    runtime.earlyReturn(ctx.prev.result);
   }
   if (ctx.source?.userAttributes) {
     ctx.stash.userAttributes = ctx.source.userAttributes;
-    runtime.earlyReturn({});
+    runtime.earlyReturn(ctx.prev.result);
   }
   const identity = ctx.identity as AppSyncIdentityCognito;
   const userId = identity.claims.sub;

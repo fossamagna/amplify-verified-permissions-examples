@@ -146,6 +146,26 @@ export function createGetParentFunction(
   return getParentFunction;
 }
 
+export function createGetItemFromModelFilterFunction(
+  construct: Construct,
+  idPrefix: string,
+  graphqlApi: IGraphqlApi,
+  dataSource: BaseDataSource,
+) {
+  const getItemBuildResult = build(
+    path.join(resolversDir, "getItemFromModelFilter.ts"),
+  );
+  const id = `${idPrefix}GetItemFromModelFilterFn`;
+  const fetchPrincipalAttrs = new AppsyncFunction(construct, id, {
+    api: graphqlApi,
+    name: id,
+    dataSource,
+    runtime: FunctionRuntime.JS_1_0_0,
+    code: Code.fromInline(getItemBuildResult.text),
+  });
+  return fetchPrincipalAttrs;
+}
+
 function createIdPrefix(logicalId: string) {
   return logicalId.replaceAll(".", "");
 }
