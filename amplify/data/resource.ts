@@ -24,6 +24,7 @@ const schema = a.schema({
       projectId: a.id(),
       project: a.belongsTo("Project", "projectId"),
       files: a.hasMany("File", "folderId"),
+      members: a.hasMany("FolderMember", "folderId"),
     })
     .authorization((allow) => [allow.authenticated()]),
   File: a
@@ -41,11 +42,19 @@ const schema = a.schema({
     userId: a.id().required(),
     projectId: a.id().required(),
     project: a.belongsTo("Project", "projectId"),
-    role: a.ref("ProjectMemberRole"),
+    role: a.ref("MemberRole"),
   })
     .identifier(["userId", "projectId"])
     .authorization((allow) => [allow.authenticated()]),
-  ProjectMemberRole: a.enum(["OWNER", "CONTRIBUTOR", "VIEWER"]),
+  FolderMember: a.model({
+    userId: a.id().required(),
+    folderId: a.id().required(),
+    folder: a.belongsTo("Folder", "folderId"),
+    role: a.ref("MemberRole"),
+  })
+    .identifier(["userId", "folderId"])
+    .authorization((allow) => [allow.authenticated()]),
+  MemberRole: a.enum(["OWNER", "CONTRIBUTOR", "VIEWER"]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
