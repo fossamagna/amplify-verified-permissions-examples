@@ -112,6 +112,7 @@ export function createGetItemFunction(
       code: getItemBuildResult.text,
     }
   );
+  getItemFunction.addDependency(dataSource);
   return getItemFunction;
 }
 
@@ -143,6 +144,9 @@ export function createGetParentFunction(
       code: getParentBuildResult.text,
     }
   );
+  if (dataSource) {
+    getParentFunction.addDependency(dataSource);
+  }
   return getParentFunction;
 }
 
