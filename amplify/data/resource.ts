@@ -42,7 +42,7 @@ const schema = a.schema({
     userId: a.id().required(),
     projectId: a.id().required(),
     project: a.belongsTo("Project", "projectId"),
-    role: a.ref("MemberRole"),
+    role: a.ref("MemberRole").required(),
   })
     .identifier(["userId", "projectId"])
     .authorization((allow) => [allow.authenticated()]),
@@ -50,7 +50,7 @@ const schema = a.schema({
     userId: a.id().required(),
     folderId: a.id().required(),
     folder: a.belongsTo("Folder", "folderId"),
-    role: a.ref("MemberRole"),
+    role: a.ref("MemberRole").required(),
   })
     .identifier(["userId", "folderId"])
     .authorization((allow) => [allow.authenticated()]),

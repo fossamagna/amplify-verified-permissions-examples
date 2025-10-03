@@ -25,6 +25,27 @@
                 "type": "Entity",
                 "name": "Project"
               }
+            },
+            "ownerFolders": {
+              "type": "Set",
+              "element": {
+                "type": "Entity",
+                "name": "Folder"
+              }
+            },
+            "contributorFolders": {
+              "type": "Set",
+              "element": {
+                "type": "Entity",
+                "name": "Folder"
+              }
+            },
+            "viewerFolders": {
+              "type": "Set",
+              "element": {
+                "type": "Entity",
+                "name": "Folder"
+              }
             }
           }
         }
@@ -182,6 +203,30 @@
         "appliesTo": {
           "principalTypes": ["User"],
           "resourceTypes": ["Project"]
+        }
+      },
+      "Folder.project": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      },
+      "Folder.files": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["File"]
+        }
+      },
+      "File.project": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Project"]
+        }
+      },
+      "File.folder": {
+        "appliesTo": {
+          "principalTypes": ["User"],
+          "resourceTypes": ["Folder"]
         }
       }
     }

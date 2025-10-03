@@ -1,9 +1,9 @@
 import type { Schema } from "../../../data/resource";
 
-export type ProjectMember = {
+export type Member = {
   userId: string; // PK
-  projectId: string; // SK
-  role: string;
+  roleAndModel: string; // SK
+  ids: string[];
 };
 
 export type Project = Pick<Schema["Project"]["type"], "id" | "name"> & {

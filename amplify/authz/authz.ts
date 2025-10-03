@@ -1,28 +1,62 @@
 import { AmplifyGraphqlApi } from "@aws-amplify/graphql-api-construct";
-import {
-  DynamoDbDataSource,
-  HttpDataSource,
-} from "aws-cdk-lib/aws-appsync";
+import { DynamoDbDataSource, HttpDataSource } from "aws-cdk-lib/aws-appsync";
+import { AttributeType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Stack } from "aws-cdk-lib";
 import { PolicyStore } from "./policy-store";
 import { PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { addAuthFunctionsToResolvers } from "./functions/index";
+import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import { DynamoEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import { StartingPosition } from "aws-cdk-lib/aws-lambda";
+
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export function authz(
   data: Omit<AmplifyGraphqlApi, "getResourceAccessAcceptor">
 ) {
-  const policyStore = new PolicyStore(data, "PolicyStore");
-  const projectMemberTable = data.resources.tables.ProjectMember;
-  const projectMemberDataSource = new DynamoDbDataSource(
-    Stack.of(projectMemberTable),
-    "ProjectMemberDS",
+  const dataStack = Stack.of(data);
+
+  const memberTable = new Table(dataStack, "MemberTable", {
+    partitionKey: { name: "userId", type: AttributeType.STRING },
+    sortKey: { name: "roleAndModel", type: AttributeType.STRING },
+  });
+
+  const memberFunction = new NodejsFunction(dataStack, "MemberFunction", {
+    entry: path.join(__dirname, "syncMember", "handler.ts"),
+    environment: {
+      MEMBER_TABLE_NAME: memberTable.tableName,
+    },
+  });
+  memberTable.grantReadWriteData(memberFunction);
+
+  console.log(Object.keys(data.resources.tables));
+
+  memberFunction.addEventSource(
+    new DynamoEventSource(data.resources.tables.ProjectMember, {
+      startingPosition: StartingPosition.LATEST,
+    })
+  );
+  memberFunction.addEventSource(
+    new DynamoEventSource(data.resources.tables.FolderMember, {
+      startingPosition: StartingPosition.LATEST,
+    })
+  );
+
+  const memberDataSource = new DynamoDbDataSource(
+    Stack.of(memberTable),
+    "MemberTableDS",
     {
       api: data.resources.graphqlApi,
-      name: "ProjectMemberDS",
-      table: projectMemberTable,
+      table: memberTable,
       readOnlyAccess: true,
     }
   );
+
+  const policyStore = new PolicyStore(data, "PolicyStore");
 
   const serviceRole = new Role(
     Stack.of(data.resources.graphqlApi),
@@ -57,22 +91,33 @@ export function authz(
     }
   );
 
-  Object.keys(data.resources.cfnResources.cfnDataSources).forEach((name) => {
-    console.log(`DataSource for ${name}`);
-  });
+  // Object.keys(data.resources.cfnResources.cfnDataSources).forEach((name) => {
+  //   console.log(`DataSource for ${name}`);
+  // });
   Object.entries(data.resources.cfnResources.cfnResolvers).forEach(
     ([name, resolver]) => {
-      console.log(`Resolver for ${name}`);
+      // console.log(`Resolver for ${name}`);
       addAuthFunctionsToResolvers(
         data.resources.graphqlApi,
         name,
+        isListResolver(name),
         resolver,
         data.resources.cfnResources.cfnDataSources,
         data.resources.tables,
         policyStore.policyStore.attrPolicyStoreId,
         verifiedPermissionsDataSource,
-        projectMemberDataSource
+        memberDataSource
       );
     }
   );
+}
+
+function isListResolver(logicalId: string): boolean {
+  return [
+    "Project.folders",
+    "Project.files",
+    "Project.members",
+    "Folder.files",
+    "Folder.members",
+  ].includes(logicalId);
 }

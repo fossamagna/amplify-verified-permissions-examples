@@ -26,7 +26,7 @@ export type AttributeValue = {
 
 export type EntityItem = {
   identifier: EntityIdentifier;
-  attributes: Record<string, AttributeValue>;
+  attributes?: Record<string, AttributeValue>;
   parents?: EntityIdentifier[];
 };
 

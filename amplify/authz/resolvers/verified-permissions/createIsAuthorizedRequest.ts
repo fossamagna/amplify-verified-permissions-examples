@@ -1,5 +1,5 @@
 import type { AppSyncIdentityCognito, Context } from "@aws-appsync/utils";
-import type { File, Folder, Project, ProjectMember } from "../types/index";
+import type { File, Folder, Member, Project } from "../types/index";
 import type {
   EntityItem,
   EntityIdentifier,
@@ -15,13 +15,12 @@ export function createBatchIsAuthorizedRequest(
 ): BatchIsAuthorizedRequest {
   const identity = ctx.identity as AppSyncIdentityCognito;
   const userId = identity.claims.sub;
-  const projectMembers = ctx.stash.userAttributes
-    .projectMembers as ProjectMember[];
+  const members = ctx.stash.userAttributes.members as Member[];
   const policyStoreId = ctx.stash.policyStoreId as string;
   const actionId = `${ctx.stash.typeName}.${ctx.stash.fieldName}`;
 
-  if (!ctx.prev.result || !ctx.prev.result.items) {
-    runtime.earlyReturn({});
+  if (!ctx.prev.result || !ctx.prev.result.items || ctx.prev.result.items.length === 0) {
+    runtime.earlyReturn(ctx.prev.result);
   }
 
   const items = ctx.prev.result.items as File[] | Folder[] | Project[];
@@ -29,7 +28,7 @@ export function createBatchIsAuthorizedRequest(
   const entities = items.map((item) => buildEntityList(item).entityList).flat();
   const resources = items.map((item) => buildResource(item));
 
-  const user = buildUser(userId, projectMembers);
+  const user = buildUser(userId, members);
   return {
     entities: {
       entityList: [user, ...entities],
@@ -50,12 +49,11 @@ export function createBatchIsAuthorizedRequest(
 export function createIsAuthorizedRequest(ctx: Context) {
   const identity = ctx.identity as AppSyncIdentityCognito;
   const userId = identity.claims.sub;
-  const projectMembers = ctx.stash.userAttributes
-    .projectMembers as ProjectMember[];
+  const members = ctx.stash.userAttributes.members as Member[];
   const policyStoreId = ctx.stash.policyStoreId as string;
   const actionId = `${ctx.stash.typeName}.${ctx.stash.fieldName}`;
 
-  const user = buildUser(userId, projectMembers);
+  const user = buildUser(userId, members);
   const entity = ctx.prev.result as File | Folder | Project;
   const entitiesDefinition = buildEntityList(entity);
 
@@ -75,15 +73,17 @@ export function createIsAuthorizedRequest(ctx: Context) {
   return requestBody;
 }
 
-function buildUser(
-  userId: string,
-  userAttributes: ProjectMember[]
-): EntityItem {
-  const toEntityIdentifier = (attr: ProjectMember): EntityIdentifier => {
-    return {
-      entityId: attr.projectId,
-      entityType: `${NAMESPACE}::Project`,
-    };
+function buildUser(userId: string, userAttributes: Member[]): EntityItem {
+  const toEntityIdentifiers = (attr: Member): EntityIdentifier[] => {
+    const type = attr.roleAndModel.endsWith("Projects")
+      ? "Project"
+      : attr.roleAndModel.endsWith("Folders")
+        ? "Folder"
+        : null;
+    return attr.ids.map((id) => ({
+      entityId: id,
+      entityType: `${NAMESPACE}::${type}`,
+    }));
   };
   const toAttributeValue = (
     entityIdentifier: EntityIdentifier
@@ -93,31 +93,35 @@ function buildUser(
     };
   };
 
+  const attributeNames = [
+    "ownerProjects",
+    "contributorProjects",
+    "viewerProjects",
+    "ownerFolders",
+    "contributorFolders",
+    "viewerFolders",
+  ];
+
+  const attributes = attributeNames.reduce(
+    (seen, attrName) => {
+      seen[attrName] = {
+        set: userAttributes
+          .filter((attr) => attr.roleAndModel === attrName)
+          .map(toEntityIdentifiers)
+          .flat()
+          .map(toAttributeValue),
+      };
+      return seen;
+    },
+    {} as Record<string, AttributeValue>
+  );
+
   return {
     identifier: {
       entityId: userId,
       entityType: `${NAMESPACE}::User`,
     },
-    attributes: {
-      ownerProjects: {
-        set: userAttributes
-          .filter((attr) => attr.role === "OWNER")
-          .map(toEntityIdentifier)
-          .map(toAttributeValue),
-      },
-      contributorProjects: {
-        set: userAttributes
-          .filter((attr) => attr.role === "CONTRIBUTOR")
-          .map(toEntityIdentifier)
-          .map(toAttributeValue),
-      },
-      viewerProjects: {
-        set: userAttributes
-          .filter((attr) => attr.role === "VIEWER")
-          .map(toEntityIdentifier)
-          .map(toAttributeValue),
-      },
-    },
+    attributes,
   };
 }
 
@@ -137,8 +141,8 @@ function buildEntityList(entity: File | Folder | Project): EntitiesDefinition {
         entityId: entity.id,
         entityType: `${NAMESPACE}::File`,
       },
-      attributes: {},
     };
+    entityList.push(fileEntity);
     let folderEntity: EntityItem | undefined;
     if (file.folderId) {
       folderEntity = {
@@ -146,7 +150,6 @@ function buildEntityList(entity: File | Folder | Project): EntitiesDefinition {
           entityId: file.folderId!,
           entityType: `${NAMESPACE}::Folder`,
         },
-        attributes: {},
       };
       entityList.push(folderEntity);
       fileEntity.parents = fileEntity.parents ?? [];
@@ -161,7 +164,6 @@ function buildEntityList(entity: File | Folder | Project): EntitiesDefinition {
           entityId: file.projectId!,
           entityType: `${NAMESPACE}::Project`,
         },
-        attributes: {},
       });
       if (folderEntity) {
         folderEntity.parents = folderEntity.parents ?? [];
@@ -183,7 +185,6 @@ function buildEntityList(entity: File | Folder | Project): EntitiesDefinition {
         entityId: entity.id,
         entityType: `${NAMESPACE}::Folder`,
       },
-      attributes: {},
     };
     entityList.push(folderEntity);
     if (folder.projectId) {
@@ -192,7 +193,6 @@ function buildEntityList(entity: File | Folder | Project): EntitiesDefinition {
           entityId: folder.projectId,
           entityType: `${NAMESPACE}::Project`,
         },
-        attributes: {},
       });
       folderEntity.parents = folderEntity.parents ?? [];
       folderEntity.parents.push({
@@ -206,7 +206,6 @@ function buildEntityList(entity: File | Folder | Project): EntitiesDefinition {
         entityId: entity.id,
         entityType: `${NAMESPACE}::Project`,
       },
-      attributes: {},
     });
   }
   // console.log(`Entity List: ${JSON.stringify(entityList, null, 2)}`);

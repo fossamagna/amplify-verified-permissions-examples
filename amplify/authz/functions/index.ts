@@ -20,6 +20,7 @@ import {
 export function addAuthFunctionsToResolvers(
   graphqlApi: IGraphqlApi,
   logicalId: string,
+  isListResolver: boolean,
   resolver: CfnResolver,
   cfnDataSources: Record<string, CfnDataSource>,
   tables: Record<string, dynamodb.ITable>,
@@ -92,6 +93,7 @@ export function addAuthFunctionsToResolvers(
     addAuthFunctionsToDefaultResolver(
       graphqlApi,
       logicalId,
+      isListResolver,
       resolver,
       cfnDataSources,
       policyStoreId,
@@ -148,6 +150,7 @@ function addAuthFunctionsToListResolver(
 function addAuthFunctionsToDefaultResolver(
   graphqlApi: IGraphqlApi,
   logicalId: string,
+  isListResolver: boolean,
   resolver: CfnResolver,
   cfnDataSources: Record<string, CfnDataSource>,
   policyStoreId: string,
@@ -169,12 +172,20 @@ function addAuthFunctionsToDefaultResolver(
         graphqlApi,
         projectMemberDataSource
       );
-      const isAuthorizedFunction = createIsAuthorizedFunction(
-        construct,
-        idPrefix,
-        graphqlApi,
-        verifiedPermissionsDataSource
-      );
+
+      const isAuthorizedFunction = isListResolver
+        ? createBatchIsAuthorizedFunction(
+            construct,
+            idPrefix,
+            graphqlApi,
+            verifiedPermissionsDataSource
+          )
+        : createIsAuthorizedFunction(
+            construct,
+            idPrefix,
+            graphqlApi,
+            verifiedPermissionsDataSource
+          );
       const preFunctions = functions.slice(0, -1);
       const dataFunction = functions[functions.length - 1];
       return [

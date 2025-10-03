@@ -1,11 +1,6 @@
 import type { AppSyncIdentityCognito, Context } from '@aws-appsync/utils';
 import * as ddb from '@aws-appsync/utils/dynamodb';
-
-type ProjectMember = {
-  userId: string; // PK
-  projectId: string; // SK
-  role: string;
-};
+import { Member } from './types';
 
 export function request(ctx: Context) {
   if (util.authType() !== "User Pool Authorization") {
@@ -17,7 +12,7 @@ export function request(ctx: Context) {
   }
   const identity = ctx.identity as AppSyncIdentityCognito;
   const userId = identity.claims.sub;
-  return ddb.query<ProjectMember>({
+  return ddb.query<Member>({
     query: {
       userId: { eq: userId },
     },
@@ -28,6 +23,6 @@ export function response(ctx: Context) {
   if (error) {
     return util.appendError(error.message, error.type, result);
   }
-  ctx.stash.userAttributes = { projectMembers: result.items };
+  ctx.stash.userAttributes = { members: result.items };
   return ctx.result;
 }

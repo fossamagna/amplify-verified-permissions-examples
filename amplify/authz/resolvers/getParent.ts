@@ -3,7 +3,7 @@ import * as ddb from '@aws-appsync/utils/dynamodb';
 
 export function request(ctx: Context) {
   if (util.authType() !== "User Pool Authorization") {
-    runtime.earlyReturn({});
+    runtime.earlyReturn(ctx.prev.result);
   }
   const modelName = ctx.stash.fieldName.replace("create", "");
   if (modelName === "Project") {

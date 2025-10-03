@@ -6,7 +6,7 @@ import { createIsAuthorizedRequest } from "./verified-permissions/createIsAuthor
 
 export function request(ctx: Context) {
   if (util.authType() !== "User Pool Authorization") {
-    runtime.earlyReturn({});
+    runtime.earlyReturn(ctx.prev.result);
   }
   const requestBody = createIsAuthorizedRequest(ctx);
   return {
@@ -26,7 +26,7 @@ export function request(ctx: Context) {
 }
 
 export function response(ctx: Context) {
-  const { error, result, stash } = ctx;
+  const { error, result } = ctx;
   console.log("IsAuthorized response", JSON.stringify(result));
   if (error) {
     return util.appendError(error.message, error.type, result);
