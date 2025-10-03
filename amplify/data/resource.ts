@@ -14,6 +14,7 @@ const schema = a.schema({
       // relations
       folders: a.hasMany("Folder", "projectId"),
       files: a.hasMany("File", "projectId"),
+      members: a.hasMany("ProjectMember", "projectId"),
     })
     .authorization((allow) => [allow.authenticated()]),
   Folder: a
@@ -23,6 +24,7 @@ const schema = a.schema({
       projectId: a.id(),
       project: a.belongsTo("Project", "projectId"),
       files: a.hasMany("File", "folderId"),
+      members: a.hasMany("FolderMember", "folderId"),
     })
     .authorization((allow) => [allow.authenticated()]),
   File: a
@@ -36,6 +38,23 @@ const schema = a.schema({
       project: a.belongsTo("Project", "projectId"),
     })
     .authorization((allow) => [allow.authenticated()]),
+  ProjectMember: a.model({
+    userId: a.id().required(),
+    projectId: a.id().required(),
+    project: a.belongsTo("Project", "projectId"),
+    role: a.ref("MemberRole").required(),
+  })
+    .identifier(["userId", "projectId"])
+    .authorization((allow) => [allow.authenticated()]),
+  FolderMember: a.model({
+    userId: a.id().required(),
+    folderId: a.id().required(),
+    folder: a.belongsTo("Folder", "folderId"),
+    role: a.ref("MemberRole").required(),
+  })
+    .identifier(["userId", "folderId"])
+    .authorization((allow) => [allow.authenticated()]),
+  MemberRole: a.enum(["OWNER", "CONTRIBUTOR", "VIEWER"]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
@@ -44,6 +63,10 @@ export const data = defineData({
   schema,
   authorizationModes: {
     defaultAuthorizationMode: "userPool",
+  },
+  logging: {
+    fieldLogLevel: "debug",
+    excludeVerboseContent: false,
   },
 });
 

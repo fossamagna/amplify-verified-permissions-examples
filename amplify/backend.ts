@@ -1,8 +1,10 @@
-import { defineBackend } from '@aws-amplify/backend';
-import { auth } from './auth/resource';
-import { data } from './data/resource';
+import { defineBackend } from "@aws-amplify/backend";
+import { auth } from "./auth/resource";
+import { data } from "./data/resource";
+import { authz } from "./authz/authz";
 
-defineBackend({
+const backend = defineBackend({
   auth,
   data,
 });
+authz(backend.data);

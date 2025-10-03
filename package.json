@@ -12,6 +12,11 @@
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.12.0",
+    "@aws-appsync/eslint-plugin": "1.10.1",
+    "@aws-appsync/utils": "^2.0.3",
+    "@aws-sdk/client-dynamodb": "^3.902.0",
+    "@aws-sdk/lib-dynamodb": "^3.902.0",
+    "@aws-sdk/util-dynamodb": "^3.902.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.1",
